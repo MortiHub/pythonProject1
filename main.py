@@ -41,7 +41,7 @@ def process_income(message):
             data[user_id] = []
 
         data[user_id].append({"Дата": formatted_date, "Тип": "Приход", "Сумма": amount, "Источник": source})
-        bot.send_message(message.chat.id, "Приход добавлен!", reply_markup=main_keyboard())
+        bot.send_message(message.chat.id, "Приход добавлен", reply_markup=main_keyboard())
     except ValueError:
         bot.send_message(message.chat.id, "Неправильный формат ввода. Попробуйте снова.", reply_markup=main_keyboard())
 
