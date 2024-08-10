@@ -11,7 +11,7 @@ bot = telebot.TeleBot(API_TOKEN)
 
 # Хранение данных о транзакциях
 data = {}
-
+#КОСТЯ ЛОХ х2
 
 # Главные кнопки
 def main_keyboard():
