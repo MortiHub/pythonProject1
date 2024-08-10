@@ -42,7 +42,11 @@ def start(message):
     user_id = message.from_user.id
     load_data_from_file(user_id)  # Загрузка данных из файла при старте
     bot.send_message(message.chat.id, "Привет! Я помогу вести учет денежных потоков.", reply_markup=main_keyboard())
-
+@bot.message_handler(commands=['refresh'])
+def start(message):
+    user_id = message.from_user.id
+    load_data_from_file(user_id)  # Загрузка данных из файла при перезагрузки
+    bot.send_message(message.chat.id, "Привет! Ваша таблица загружена", reply_markup=main_keyboard())
 
 @bot.message_handler(func=lambda message: message.text == 'Добавить приход')
 def add_income(message):
@@ -108,15 +112,18 @@ def export_data(message):
 @bot.message_handler(func=lambda message: message.text == 'Удалить таблицу')
 def delete_table(message):
     user_id = message.from_user.id
-    keyboard = types.InlineKeyboardMarkup()
-    keyboard.add(types.InlineKeyboardButton("Да", callback_data="confirm_delete"))
-    keyboard.add(types.InlineKeyboardButton("Нет", callback_data="cancel_delete"))
-    bot.send_message(message.chat.id, "Вы уверены, что хотите удалить все данные?", reply_markup=keyboard)
-
+    if user_id in data and data[user_id]:
+        keyboard = types.InlineKeyboardMarkup()
+        keyboard.add(types.InlineKeyboardButton("Да", callback_data="confirm_delete"))
+        keyboard.add(types.InlineKeyboardButton("Нет", callback_data="cancel_delete"))
+        bot.send_message(message.chat.id, "Вы уверены, что хотите удалить все данные?", reply_markup=keyboard)
+    else:
+        bot.send_message(message.chat.id, "Нет данных для удаления.", reply_markup=main_keyboard())
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     user_id = call.from_user.id
+
     if call.data == "confirm_delete":
         data[user_id] = []  # Очищаем данные в памяти
         file_name = os.path.join(FILE_DIR, f'financial_report_{user_id}.xlsx')
