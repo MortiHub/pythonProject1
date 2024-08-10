@@ -78,7 +78,7 @@ def export_data(message):
         file_name = f'financial_report_{user_id}.xlsx'
         df.to_excel(file_name, index=False)
 
-        # Удаление итоговой строки из DataFrame перед сохранением обратно в структуру данных
+        # Удаление итоговой строки из DataFrame перед сохранением обратно
         df = df[df["Тип"] != "Прибыль"]
         data[user_id] = df.to_dict('records')
 
