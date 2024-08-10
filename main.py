@@ -40,7 +40,7 @@ def process_income(message):
         if user_id not in data:
             data[user_id] = []
 
-        data[user_id].append({"Дата": formatted_date, "Тип": "Приход", "Сумма": amount, "Источник": source})
+        data[user_id].append({"Дата": formatted_date, "Тип": "Приход", "Сумма": float(amount), "Источник": source})
         bot.send_message(message.chat.id, "Приход добавлен", reply_markup=main_keyboard())
     except ValueError:
         bot.send_message(message.chat.id, "Неправильный формат ввода. Попробуйте снова.", reply_markup=main_keyboard())
@@ -48,7 +48,7 @@ def process_income(message):
 
 @bot.message_handler(func=lambda message: message.text == 'Добавить расход')
 def add_expense(message):
-    msg = bot.send_message(message.chat.id, "Введите сумму расхода и категорию (например, '5000 на аренду'):")
+    msg = bot.send_message(message.chat.id, "Введите сумму расхода и категорию (например, '-5000 на аренду'):")
     bot.register_next_step_handler(msg, process_expense)
 
 
@@ -59,7 +59,7 @@ def process_expense(message):
         if user_id not in data:
             data[user_id] = []
 
-        data[user_id].append({"Дата": formatted_date, "Тип": "Расход", "Сумма": amount, "Категория": category})
+        data[user_id].append({"Дата": formatted_date, "Тип": "Расход", "Сумма": float(amount), "Категория": category})
         bot.send_message(message.chat.id, "Расход добавлен!", reply_markup=main_keyboard())
     except ValueError:
         bot.send_message(message.chat.id, "Неправильный формат ввода. Попробуйте снова.", reply_markup=main_keyboard())
@@ -70,8 +70,18 @@ def export_data(message):
     user_id = message.from_user.id
     if user_id in data:
         df = pd.DataFrame(data[user_id])
+
+        # Добавление строки с общей суммой
+        total_sum = df["Сумма"].sum()
+        df = pd.concat([df, pd.DataFrame([{"Тип": "Прибыль", "Сумма": total_sum}])], ignore_index=True)
+
         file_name = f'financial_report_{user_id}.xlsx'
         df.to_excel(file_name, index=False)
+
+        # Удаление итоговой строки из DataFrame перед сохранением обратно в структуру данных
+        df = df[df["Тип"] != "Прибыль"]
+        data[user_id] = df.to_dict('records')
+
         with open(file_name, 'rb') as file:
             bot.send_document(message.chat.id, file)
     else:
