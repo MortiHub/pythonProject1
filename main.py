@@ -62,7 +62,7 @@ def process_expense(message):
         data[user_id].append({"Дата": formatted_date, "Тип": "Расход", "Сумма": amount, "Категория": category})
         bot.send_message(message.chat.id, "Расход добавлен!", reply_markup=main_keyboard())
     except ValueError:
-        bot.send_message(message.chat.id, "Неправильный формат ввода. Попробуйте снова.", reply_markup=main_keyboard())
+        bot.send_message(message.chat.id, "Неправильный формат ввода. Попробуйте снов.", reply_markup=main_keyboard())
 
 
 @bot.message_handler(func=lambda message: message.text == 'Экспорт данных')
