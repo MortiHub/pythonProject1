@@ -43,7 +43,7 @@ def start(message):
     load_data_from_file(user_id)  # Загрузка данных из файла при старте
     bot.send_message(message.chat.id, "Привет! Я помогу вести учет денежных потоков.", reply_markup=main_keyboard())
 @bot.message_handler(commands=['refresh'])
-def start(message):
+def refresh(message):
     user_id = message.from_user.id
     load_data_from_file(user_id)  # Загрузка данных из файла при перезагрузки
     bot.send_message(message.chat.id, "Привет! Ваша таблица загружена", reply_markup=main_keyboard())
@@ -60,7 +60,6 @@ def process_income(message):
         user_id = message.from_user.id
         if user_id not in data:
             data[user_id] = []
-
         data[user_id].append({"Дата": formatted_date, "Тип": "Приход", "Сумма": float(amount), "Источник": source})
         bot.send_message(message.chat.id, "Приход добавлен!", reply_markup=main_keyboard())
     except ValueError:
@@ -78,6 +77,7 @@ def process_expense(message):
         amount, category = message.text.split(' на ')
         user_id = message.from_user.id
         if user_id not in data:
+
             data[user_id] = []
 
         data[user_id].append({"Дата": formatted_date, "Тип": "Расход", "Сумма": float(amount), "Категория": category})
@@ -89,17 +89,14 @@ def process_expense(message):
 @bot.message_handler(func=lambda message: message.text == 'Экспорт данных')
 def export_data(message):
     user_id = message.from_user.id
+
     if user_id in data and data[user_id]:
         df = pd.DataFrame(data[user_id])
-
         # Добавление строки с общей суммой
         total_sum = df["Сумма"].sum()
         df = pd.concat([df, pd.DataFrame([{"Тип": "Итого", "Сумма": total_sum}])], ignore_index=True)
-
         file_name = os.path.join(FILE_DIR, f'financial_report_{user_id}.xlsx')
         df.to_excel(file_name, index=False)
-
-        # Удаление итоговой строки из DataFrame перед сохранением обратно в структуру данных
         df = df[df["Тип"] != "Итого"]
         data[user_id] = df.to_dict('records')
 
@@ -112,6 +109,7 @@ def export_data(message):
 @bot.message_handler(func=lambda message: message.text == 'Удалить таблицу')
 def delete_table(message):
     user_id = message.from_user.id
+
     if user_id in data and data[user_id]:
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(types.InlineKeyboardButton("Да", callback_data="confirm_delete"))
@@ -123,7 +121,6 @@ def delete_table(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     user_id = call.from_user.id
-
     if call.data == "confirm_delete":
         data[user_id] = []  # Очищаем данные в памяти
         file_name = os.path.join(FILE_DIR, f'financial_report_{user_id}.xlsx')
