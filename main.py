@@ -8,7 +8,7 @@ formatted_date = now.strftime('%d-%m-%Y')
 API_TOKEN = '7281044136:AAGwoyl2iVDfvvo_y6Qe64oW8mFv4AE4WL4'
 
 bot = telebot.TeleBot(API_TOKEN)
-bot = telebot.TeleBot(API_TOKEN)
+
 
 # Папка для хранения файлов
 FILE_DIR = 'data'
