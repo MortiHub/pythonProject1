@@ -8,13 +8,11 @@ formatted_date = now.strftime('%d-%m-%Y')
 API_TOKEN = '7281044136:AAGwoyl2iVDfvvo_y6Qe64oW8mFv4AE4WL4'
 
 bot = telebot.TeleBot(API_TOKEN)
-
-
 # Папка для хранения файлов
 FILE_DIR = 'data'
 os.makedirs(FILE_DIR, exist_ok=True)
 
-# Хранение данных о транзакциях
+# Хранение данных о транзакциях в памяти (можно использовать для дополнительных целей)
 data = {}
 
 # Предустановленные категории
@@ -30,6 +28,20 @@ def load_data_from_file(user_id):
         data[user_id] = df.to_dict('records')
         return True
     return False
+
+
+# Функция для сохранения новой транзакции в файл
+def save_transaction_to_file(user_id, transaction):
+    file_name = os.path.join(FILE_DIR, f'financial_report_{user_id}.xlsx')
+
+    # Если файл уже существует, загружаем данные, иначе создаем новый DataFrame
+    if os.path.exists(file_name):
+        df = pd.read_excel(file_name)
+        df = pd.concat([df, pd.DataFrame([transaction])], ignore_index=True)
+    else:
+        df = pd.DataFrame([transaction])
+
+    df.to_excel(file_name, index=False)
 
 
 # Главные кнопки
@@ -52,6 +64,8 @@ def start(message):
 
 @bot.message_handler(func=lambda message: message.text == '➕Добавить приход')
 def add_income(message):
+    user_id = message.from_user.id
+    load_data_from_file(user_id)
     msg = bot.send_message(message.chat.id, "Введите сумму прихода:")
     bot.register_next_step_handler(msg, process_income_amount)
 
@@ -82,7 +96,8 @@ def process_income_category(message, amount):
         msg = bot.send_message(message.chat.id, "Введите название нового источника:")
         bot.register_next_step_handler(msg, process_new_income_category, amount)
     else:
-        save_transaction(user_id, "Приход", amount, category, is_income=True)
+        transaction = {"Дата": formatted_date, "Тип": "Приход", "Сумма": amount, "Источник": category}
+        save_transaction(user_id, transaction)
         bot.send_message(message.chat.id, "Приход добавлен!", reply_markup=main_keyboard())
 
 
@@ -90,12 +105,15 @@ def process_new_income_category(message, amount):
     new_category = message.text
     income_categories.append(new_category)  # Добавляем новую категорию в список
     user_id = message.from_user.id
-    save_transaction(user_id, "Приход", amount, new_category, is_income=True)
+    transaction = {"Дата": formatted_date, "Тип": "Приход", "Сумма": amount, "Источник": new_category}
+    save_transaction(user_id, transaction)
     bot.send_message(message.chat.id, "Приход добавлен!", reply_markup=main_keyboard())
 
 
 @bot.message_handler(func=lambda message: message.text == '➖Добавить расход')
 def add_expense(message):
+    user_id = message.from_user.id
+    load_data_from_file(user_id)
     msg = bot.send_message(message.chat.id, "Введите сумму расхода:")
     bot.register_next_step_handler(msg, process_expense_amount)
 
@@ -126,7 +144,8 @@ def process_expense_category(message, amount):
         msg = bot.send_message(message.chat.id, "Введите название новой категории:")
         bot.register_next_step_handler(msg, process_new_expense_category, amount)
     else:
-        save_transaction(user_id, "Расход", -amount, category, is_income=False)
+        transaction = {"Дата": formatted_date, "Тип": "Расход", "Сумма": -amount, "Категория": category}
+        save_transaction(user_id, transaction)
         bot.send_message(message.chat.id, "Расход добавлен!", reply_markup=main_keyboard())
 
 
@@ -134,22 +153,19 @@ def process_new_expense_category(message, amount):
     new_category = message.text
     expense_categories.append(new_category)  # Добавляем новую категорию в список
     user_id = message.from_user.id
-    save_transaction(user_id, "Расход", -amount, new_category, is_income=False)
+    transaction = {"Дата": formatted_date, "Тип": "Расход", "Сумма": -amount, "Категория": new_category}
+    save_transaction(user_id, transaction)
     bot.send_message(message.chat.id, "Расход добавлен!", reply_markup=main_keyboard())
 
 
-def save_transaction(user_id, transaction_type, amount, category, is_income):
+def save_transaction(user_id, transaction):
+    # Сохраняем транзакцию в памяти (опционально)
     if user_id not in data:
         data[user_id] = []
-
-    transaction = {"Дата": formatted_date, "Тип": transaction_type, "Сумма": amount}
-
-    if is_income:
-        transaction["Источник"] = category  # Для прихода добавляем источник
-    else:
-        transaction["Категория"] = category  # Для расхода добавляем категорию
-
     data[user_id].append(transaction)
+
+    # Сохраняем транзакцию в файл
+    save_transaction_to_file(user_id, transaction)
 
 
 @bot.message_handler(func=lambda message: message.text == 'Экспорт данных')
@@ -176,13 +192,6 @@ def export_data(message):
     temp_file_name = os.path.join(FILE_DIR, f'temp_financial_report_{user_id}.xlsx')
     df_with_total.to_excel(temp_file_name, index=False)
 
-    # Удаляем строку "Итого" из DataFrame перед сохранением основного файла
-    df = df[df["Тип"] != "Итого"]
-    data[user_id] = df.to_dict('records')
-
-    file_name = os.path.join(FILE_DIR, f'financial_report_{user_id}.xlsx')
-    df.to_excel(file_name, index=False)
-
     # Отправляем временный файл пользователю
     with open(temp_file_name, 'rb') as file:
         bot.send_document(message.chat.id, file)
@@ -194,6 +203,7 @@ def export_data(message):
 @bot.message_handler(func=lambda message: message.text == 'Удалить таблицу')
 def delete_table(message):
     user_id = message.from_user.id
+    load_data_from_file(user_id)
     if user_id in data and data[user_id]:
         keyboard = types.InlineKeyboardMarkup()
         keyboard.add(types.InlineKeyboardButton("Да", callback_data="confirm_delete"))
