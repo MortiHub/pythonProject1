@@ -200,7 +200,7 @@ def delete_table(message):
         keyboard.add(types.InlineKeyboardButton("Нет", callback_data="cancel_delete"))
         bot.send_message(message.chat.id, "Вы уверены, что хотите удалить все данные?", reply_markup=keyboard)
     else:
-        bot.send_message(message.chat.id, "Нет данных для экспорта.", reply_markup=main_keyboard())
+        bot.send_message(message.chat.id, "Нет данных для удаления.", reply_markup=main_keyboard())
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
