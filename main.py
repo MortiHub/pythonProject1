@@ -54,7 +54,6 @@ def main_keyboard():
     keyboard.add(types.KeyboardButton('Удалить таблицу'))
     return keyboard
 
-
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
@@ -62,15 +61,24 @@ def start(message):
     bot.send_message(message.chat.id, "Привет! Я помогу вести учет денежных потоков.", reply_markup=main_keyboard())
 
 
+def cancel_keyboard():
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+    keyboard.add(types.KeyboardButton('Отмена'))
+    return keyboard
+
+
 @bot.message_handler(func=lambda message: message.text == '➕Добавить приход')
 def add_income(message):
     user_id = message.from_user.id
     load_data_from_file(user_id)
-    msg = bot.send_message(message.chat.id, "Введите сумму прихода:")
+    msg = bot.send_message(message.chat.id, "Введите сумму прихода:", reply_markup=cancel_keyboard())
     bot.register_next_step_handler(msg, process_income_amount)
 
 
 def process_income_amount(message):
+    if message.text == 'Отмена':
+        bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
+        return
     try:
         amount = float(message.text)
         user_id = message.from_user.id
@@ -85,15 +93,21 @@ def income_category_keyboard():
     for category in income_categories:
         keyboard.add(types.KeyboardButton(category))
     keyboard.add(types.KeyboardButton("Добавить свой источник"))
+    keyboard.add(types.KeyboardButton("Отмена"))
     return keyboard
 
 
 def process_income_category(message, amount):
+    if message.text == 'Отмена':
+        bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
+        return
+
     category = message.text
     user_id = message.from_user.id
 
     if category == "Добавить свой источник":
-        msg = bot.send_message(message.chat.id, "Введите название нового источника:")
+        msg = bot.send_message(message.chat.id, "Введите название нового источника:", reply_markup=cancel_keyboard())
+
         bot.register_next_step_handler(msg, process_new_income_category, amount)
     else:
         transaction = {"Дата": formatted_date, "Тип": "Приход", "Сумма": amount, "Источник": category}
@@ -102,6 +116,9 @@ def process_income_category(message, amount):
 
 
 def process_new_income_category(message, amount):
+    if message.text == 'Отмена':
+        bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
+        return
     new_category = message.text
     income_categories.append(new_category)  # Добавляем новую категорию в список
     user_id = message.from_user.id
@@ -114,11 +131,14 @@ def process_new_income_category(message, amount):
 def add_expense(message):
     user_id = message.from_user.id
     load_data_from_file(user_id)
-    msg = bot.send_message(message.chat.id, "Введите сумму расхода:")
+    msg = bot.send_message(message.chat.id, "Введите сумму расхода:", reply_markup=cancel_keyboard())
     bot.register_next_step_handler(msg, process_expense_amount)
 
 
 def process_expense_amount(message):
+    if message.text == 'Отмена':
+        bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
+        return
     try:
         amount = abs(float(message.text))  # Используем абсолютное значение для суммы
         user_id = message.from_user.id
@@ -129,19 +149,28 @@ def process_expense_amount(message):
 
 
 def expense_category_keyboard():
+
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     for category in expense_categories:
         keyboard.add(types.KeyboardButton(category))
     keyboard.add(types.KeyboardButton("Добавить свою категорию"))
+    keyboard.add(types.KeyboardButton("Отмена"))
     return keyboard
 
 
 def process_expense_category(message, amount):
+    if message.text == 'Отмена':
+        bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
+        return
+
     category = message.text
     user_id = message.from_user.id
 
     if category == "Добавить свою категорию":
-        msg = bot.send_message(message.chat.id, "Введите название новой категории:")
+        msg = bot.send_message(message.chat.id, "Введите название новой категории:", reply_markup=cancel_keyboard())
+        if message.text == 'Отмена':
+            bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
+            return
         bot.register_next_step_handler(msg, process_new_expense_category, amount)
     else:
         transaction = {"Дата": formatted_date, "Тип": "Расход", "Сумма": -amount, "Категория": category}
@@ -150,6 +179,9 @@ def process_expense_category(message, amount):
 
 
 def process_new_expense_category(message, amount):
+    if message.text == 'Отмена':
+        bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
+        return
     new_category = message.text
     expense_categories.append(new_category)  # Добавляем новую категорию в список
     user_id = message.from_user.id
