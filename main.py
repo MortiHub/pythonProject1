@@ -14,10 +14,34 @@ os.makedirs(FILE_DIR, exist_ok=True)
 
 # Хранение данных о транзакциях в памяти (можно использовать для дополнительных целей)
 data = {}
+income_category = {}
+expense_category = {}
 
+def save_categories(user_id):
+    income_df = pd.DataFrame(income_category[user_id], columns=["Категории"])
+    expense_df = pd.DataFrame(expense_category[user_id], columns=["Категории"])
+
+    file_path = os.path.join(FILE_DIR, f'categories_{user_id}.xlsx')
+
+    with pd.ExcelWriter(file_path) as writer:
+        income_df.to_excel(writer, sheet_name='Приход', index=False)
+        expense_df.to_excel(writer, sheet_name='Расход', index=False)
+
+def load_categories(user_id):
+    file_path = os.path.join(FILE_DIR, f'categories_{user_id}.xlsx')
+    if os.path.exists(file_path):
+        income_df = pd.read_excel(file_path, sheet_name='Приход')
+        expense_df = pd.read_excel(file_path, sheet_name='Расход')
+        income_category[user_id] = income_df["Категории"].tolist()
+        expense_category[user_id] = expense_df["Категории"].tolist()
+    else:
+        init_user_category(user_id)  # Инициализация категорий, если файла не существует
 # Предустановленные категории
-income_categories = ["Продажи", "Зарплата", "Подарки"]
-expense_categories = ["Аренда", "Продукты", "Транспорт"]
+
+def init_user_category(user_id):
+    income_category[user_id] = ["Продажи", "Зарплата", "Подарки"]
+    expense_category[user_id] = ["Аренда", "Продукты", "Транспорт"]
+    save_categories(user_id)
 
 
 # Функция для загрузки данных из файла
@@ -57,6 +81,7 @@ def main_keyboard():
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
+    load_categories(user_id)
     load_data_from_file(user_id)  # Загрузка данных из файла при старте
     bot.send_message(message.chat.id, "Привет! Я помогу вести учет денежных потоков.", reply_markup=main_keyboard())
 
@@ -71,6 +96,7 @@ def cancel_keyboard():
 def add_income(message):
     user_id = message.from_user.id
     load_data_from_file(user_id)
+    load_categories(user_id)
     msg = bot.send_message(message.chat.id, "Введите сумму прихода:", reply_markup=cancel_keyboard())
     bot.register_next_step_handler(msg, process_income_amount)
 
@@ -82,15 +108,15 @@ def process_income_amount(message):
     try:
         amount = float(message.text)
         user_id = message.from_user.id
-        bot.send_message(message.chat.id, "Выберите источник прихода:", reply_markup=income_category_keyboard())
+        bot.send_message(message.chat.id, "Выберите источник прихода:", reply_markup=income_category_keyboard(user_id))
         bot.register_next_step_handler(message, process_income_category, amount)
     except ValueError:
         bot.send_message(message.chat.id, "Неправильный формат суммы. Попробуйте снова.", reply_markup=main_keyboard())
 
 
-def income_category_keyboard():
+def income_category_keyboard(user_id):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    for category in income_categories:
+    for category in income_category.get(user_id, []):
         keyboard.add(types.KeyboardButton(category))
     keyboard.add(types.KeyboardButton("Добавить свой источник"))
     keyboard.add(types.KeyboardButton("Отмена"))
@@ -119,9 +145,15 @@ def process_new_income_category(message, amount):
     if message.text == 'Отмена':
         bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
         return
-    new_category = message.text
-    income_categories.append(new_category)  # Добавляем новую категорию в список
+    new_category = message.text     # Добавляем новую категорию в список
     user_id = message.from_user.id
+
+    if user_id in income_category:
+        income_category[user_id].append(new_category)
+        save_categories(user_id)
+    else:
+        income_category[user_id] = [new_category]
+        save_categories(user_id)    # Сохранение после добавления новой категории
     transaction = {"Дата": formatted_date, "Тип": "Приход", "Сумма": amount, "Источник": new_category}
     save_transaction(user_id, transaction)
     bot.send_message(message.chat.id, "Приход добавлен!", reply_markup=main_keyboard())
@@ -131,6 +163,7 @@ def process_new_income_category(message, amount):
 def add_expense(message):
     user_id = message.from_user.id
     load_data_from_file(user_id)
+    load_categories(user_id)
     msg = bot.send_message(message.chat.id, "Введите сумму расхода:", reply_markup=cancel_keyboard())
     bot.register_next_step_handler(msg, process_expense_amount)
 
@@ -142,16 +175,16 @@ def process_expense_amount(message):
     try:
         amount = abs(float(message.text))  # Используем абсолютное значение для суммы
         user_id = message.from_user.id
-        bot.send_message(message.chat.id, "Выберите категорию расхода:", reply_markup=expense_category_keyboard())
+        bot.send_message(message.chat.id, "Выберите категорию расхода:", reply_markup=expense_category_keyboard(user_id))
         bot.register_next_step_handler(message, process_expense_category, amount)
     except ValueError:
         bot.send_message(message.chat.id, "Неправильный формат суммы. Попробуйте снова.", reply_markup=main_keyboard())
 
 
-def expense_category_keyboard():
+def expense_category_keyboard(user_id):
 
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    for category in expense_categories:
+    for category in expense_category.get(user_id, []):
         keyboard.add(types.KeyboardButton(category))
     keyboard.add(types.KeyboardButton("Добавить свою категорию"))
     keyboard.add(types.KeyboardButton("Отмена"))
@@ -183,8 +216,15 @@ def process_new_expense_category(message, amount):
         bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
         return
     new_category = message.text
-    expense_categories.append(new_category)  # Добавляем новую категорию в список
+
+     # Добавляем новую категорию в список
     user_id = message.from_user.id
+    if user_id in expense_category:
+        expense_category[user_id].append(new_category)
+        save_categories(user_id)
+    else:
+        expense_category[user_id] = [new_category]
+        save_categories(user_id)
     transaction = {"Дата": formatted_date, "Тип": "Расход", "Сумма": -amount, "Категория": new_category}
     save_transaction(user_id, transaction)
     bot.send_message(message.chat.id, "Расход добавлен!", reply_markup=main_keyboard())
