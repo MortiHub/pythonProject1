@@ -346,6 +346,7 @@ def save_transaction(user_id, transaction):
 @bot.message_handler(func=lambda message: message.text == 'Экспорт данных')
 def export_data(message):
     user_id = message.from_user.id
+
     if check_subscription(user_id):
         if user_id not in data or not data[user_id]:
             # Попытка загрузить данные из файла
@@ -357,6 +358,7 @@ def export_data(message):
             return
 
         # Если данные уже загружены или были в памяти
+
         df = pd.DataFrame(data[user_id])
 
         # Добавление строки с общей суммой
@@ -380,6 +382,7 @@ def export_data(message):
 @bot.message_handler(func=lambda message: message.text == 'Удалить таблицу')
 def delete_data(message):
     user_id = message.from_user.id
+
     if check_subscription(user_id):
         load_data_from_file(user_id)
         if user_id in data and data[user_id]:
@@ -391,6 +394,7 @@ def delete_data(message):
             bot.send_message(message.chat.id, "Нет данных для удаления.", reply_markup=main_keyboard())
     else:
         bot.send_message(message.chat.id, "Для получения доступа оплатите подписку.", reply_markup=check_keyboard())
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     user_id = call.from_user.id
