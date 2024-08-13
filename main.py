@@ -253,6 +253,7 @@ def save_transaction(user_id, transaction):
 @bot.message_handler(func=lambda message: message.text == 'Экспорт данных')
 def export_data(message):
     user_id = message.from_user.id
+    load_data_from_file(user_id)
     if user_id in data and data[user_id]:
         file_name = f'financial_report_{user_id}.xlsx'
         df = pd.DataFrame(data[user_id])
@@ -266,11 +267,14 @@ def export_data(message):
 @bot.message_handler(func=lambda message: message.text == 'Удалить таблицу')
 def delete_data(message):
     user_id = message.from_user.id
-    confirm_keyboard = types.InlineKeyboardMarkup()
-    confirm_keyboard.add(types.InlineKeyboardButton("Да", callback_data="confirm_delete"))
-    confirm_keyboard.add(types.InlineKeyboardButton("Нет", callback_data="cancel_delete"))
-    bot.send_message(message.chat.id, "Вы уверены, что хотите удалить все данные?", reply_markup=confirm_keyboard)
-
+    load_data_from_file(user_id)
+    if user_id in data and data[user_id]:
+        confirm_keyboard = types.InlineKeyboardMarkup()
+        confirm_keyboard.add(types.InlineKeyboardButton("Да", callback_data="confirm_delete"))
+        confirm_keyboard.add(types.InlineKeyboardButton("Нет", callback_data="cancel_delete"))
+        bot.send_message(message.chat.id, "Вы уверены, что хотите удалить все данные?", reply_markup=confirm_keyboard)
+    else:
+        bot.send_message(message.chat.id, "Нет данных для удаления.", reply_markup=main_keyboard())
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     user_id = call.from_user.id
