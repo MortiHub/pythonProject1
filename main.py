@@ -1,14 +1,16 @@
-import telebot
+import requests
 from datetime import datetime, timedelta
 import pandas as pd
+import time
 from telebot import TeleBot, types
 import os
 import sqlite3
+
 now = datetime.now()
 formatted_date = now.strftime('%d-%m-%Y')
 
 API_TOKEN = '7281044136:AAGwoyl2iVDfvvo_y6Qe64oW8mFv4AE4WL4'
-PAYMENT_PROVIDER_TOKEN = '401643678:TEST:3a876337-7dbc-4f3f-b54a-fa6b534a7533'
+PAYMENT_PROVIDER_TOKEN = '390540012:LIVE:55128'
 
 bot = TeleBot(API_TOKEN)
 
@@ -18,13 +20,18 @@ os.makedirs(FILE_DIR, exist_ok=True)
 data = {}
 income_category = {}
 expense_category = {}
+
+
 # Инициализация базы данных для хранения подписок
+
 def create_db():
     conn = sqlite3.connect('subscriptions.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS subscriptions (user_id INTEGER PRIMARY KEY, active INTEGER, start_date TEXT)''')
+    c.execute(
+        '''CREATE TABLE IF NOT EXISTS subscriptions (user_id INTEGER PRIMARY KEY, active INTEGER, start_date TEXT)''')
     conn.commit()
     conn.close()
+
 
 def update_subscription_status(user_id, active):
     start_date = datetime.now().strftime('%Y-%m-%d')
@@ -53,7 +60,7 @@ def get_subscription_status(user_id):
 
 
 # Инициализация базы данных при запуске
-create_db()
+
 # Инициализация базы данных при запуске
 create_db()
 
@@ -67,6 +74,8 @@ def save_categories(user_id):
     with pd.ExcelWriter(file_path) as writer:
         income_df.to_excel(writer, sheet_name='Приход', index=False)
         expense_df.to_excel(writer, sheet_name='Расход', index=False)
+
+
 def load_categories(user_id):
     file_path = os.path.join(FILE_DIR, f'categories_{user_id}.xlsx')
     if os.path.exists(file_path):
@@ -77,10 +86,12 @@ def load_categories(user_id):
     else:
         init_user_category(user_id)
 
+
 def init_user_category(user_id):
     income_category[user_id] = ["Продажи", "Зарплата", "Подарки"]
     expense_category[user_id] = ["Аренда", "Продукты", "Транспорт"]
     save_categories(user_id)
+
 
 def load_data_from_file(user_id):
     file_name = os.path.join(FILE_DIR, f'financial_report_{user_id}.xlsx')
@@ -89,6 +100,7 @@ def load_data_from_file(user_id):
         data[user_id] = df.to_dict('records')
         return True
     return False
+
 
 def save_transaction_to_file(user_id, transaction):
     file_name = os.path.join(FILE_DIR, f'financial_report_{user_id}.xlsx')
@@ -107,6 +119,7 @@ def check_keyboard():
     keyboard.add(btn1)
     return keyboard
 
+
 def main_keyboard():
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     btn1 = types.KeyboardButton('➕Добавить приход')
@@ -115,6 +128,8 @@ def main_keyboard():
     keyboard.add(types.KeyboardButton('Экспорт данных'))
     keyboard.add(types.KeyboardButton('Удалить таблицу'))
     return keyboard
+
+
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
@@ -123,25 +138,31 @@ def start(message):
         load_data_from_file(user_id)
         bot.send_message(message.chat.id, "Привет! У вас есть доступ к подписке.", reply_markup=main_keyboard())
     else:
-        bot.send_message(message.chat.id, "Привет! Для получения доступа, пожалуйста, оформите подписку.", reply_markup=check_keyboard())
+        bot.send_message(message.chat.id, "Привет! Для получения доступа, пожалуйста, оформите подписку.",
+                         reply_markup=check_keyboard())
+
 
 def check_subscription(user_id):
     # Проверка статуса подписки пользователя
     return get_subscription_status(user_id)
+
 
 def cancel_keyboard():
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     keyboard.add(types.KeyboardButton('Отмена'))
     return keyboard
 
+
 @bot.message_handler(func=lambda message: message.text == 'Доступ к подписке')
 def access_subscription(message):
     user_id = message.from_user.id
     if check_subscription(user_id):
-        bot.send_message(message.chat.id, "У вас есть доступ! Вы можете пользоваться ботом.", reply_markup=main_keyboard())
+        bot.send_message(message.chat.id, "У вас есть доступ! Вы можете пользоваться ботом.",
+                         reply_markup=main_keyboard())
     else:
         bot.send_message(message.chat.id, "Для получения доступа оплатите подписку.", reply_markup=check_keyboard())
         send_invoice(message)
+
 
 def send_invoice(message):
     user_id = message.from_user.id
@@ -159,9 +180,11 @@ def send_invoice(message):
         is_flexible=False,  # True если сумма может варьироваться
     )
 
+
 @bot.pre_checkout_query_handler(func=lambda query: True)
 def checkout(pre_checkout_query):
     bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
 
 @bot.message_handler(content_types=['successful_payment'])
 def got_payment(message):
@@ -169,6 +192,8 @@ def got_payment(message):
     # Обновление статуса подписки в базе данных
     update_subscription_status(user_id, True)
     bot.send_message(message.chat.id, "Спасибо за оплату! Подписка активирована.", reply_markup=main_keyboard())
+
+
 @bot.message_handler(func=lambda message: message.text == '➕Добавить приход')
 def add_income(message):
     user_id = message.from_user.id
@@ -178,7 +203,10 @@ def add_income(message):
         msg = bot.send_message(message.chat.id, "Введите сумму прихода:", reply_markup=cancel_keyboard())
         bot.register_next_step_handler(msg, process_income_amount)
     else:
-        bot.send_message(message.chat.id, "Привет! Для получения доступа, пожалуйста, оформите подписку.", reply_markup=check_keyboard())
+        bot.send_message(message.chat.id, "Привет! Для получения доступа, пожалуйста, оформите подписку.",
+                         reply_markup=check_keyboard())
+
+
 def process_income_amount(message):
     if message.text == 'Отмена':
         bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
@@ -191,6 +219,7 @@ def process_income_amount(message):
     except ValueError:
         bot.send_message(message.chat.id, "Неправильный формат суммы. Попробуйте снова.", reply_markup=main_keyboard())
 
+
 def income_category_keyboard(user_id):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     for category in income_category.get(user_id, []):
@@ -200,6 +229,7 @@ def income_category_keyboard(user_id):
     keyboard.add(types.KeyboardButton("Отмена"))
     return keyboard
 
+
 def process_income_category(message, amount):
     if message.text == 'Отмена':
         bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
@@ -207,7 +237,8 @@ def process_income_category(message, amount):
 
     user_id = message.from_user.id
     if message.text == "Удалить источник":
-        bot.send_message(message.chat.id, "Выберите источник для удаления:", reply_markup=delete_category_keyboard(user_id, "income"))
+        bot.send_message(message.chat.id, "Выберите источник для удаления:",
+                         reply_markup=delete_category_keyboard(user_id, "income"))
         bot.register_next_step_handler(message, process_delete_category, "income")
         return
 
@@ -219,6 +250,7 @@ def process_income_category(message, amount):
         transaction = {"Дата": formatted_date, "Тип": "Приход", "Сумма": amount, "Источник": category}
         save_transaction(user_id, transaction)
         bot.send_message(message.chat.id, "Приход добавлен!", reply_markup=main_keyboard())
+
 
 def process_new_income_category(message, amount):
     if message.text == 'Отмена':
@@ -237,6 +269,7 @@ def process_new_income_category(message, amount):
     save_transaction(user_id, transaction)
     bot.send_message(message.chat.id, "Приход добавлен!", reply_markup=main_keyboard())
 
+
 @bot.message_handler(func=lambda message: message.text == '➖Добавить расход')
 def add_expense(message):
     user_id = message.from_user.id
@@ -247,6 +280,8 @@ def add_expense(message):
         bot.register_next_step_handler(msg, process_expense_amount)
     else:
         bot.send_message(message.chat.id, "Для получения доступа оплатите подписку.", reply_markup=check_keyboard())
+
+
 def process_expense_amount(message):
     if message.text == 'Отмена':
         bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
@@ -254,10 +289,12 @@ def process_expense_amount(message):
     try:
         amount = abs(float(message.text))
         user_id = message.from_user.id
-        bot.send_message(message.chat.id, "Выберите категорию расхода:", reply_markup=expense_category_keyboard(user_id))
+        bot.send_message(message.chat.id, "Выберите категорию расхода:",
+                         reply_markup=expense_category_keyboard(user_id))
         bot.register_next_step_handler(message, process_expense_category, amount)
     except ValueError:
         bot.send_message(message.chat.id, "Неправильный формат суммы. Попробуйте снова.", reply_markup=main_keyboard())
+
 
 def expense_category_keyboard(user_id):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -268,6 +305,7 @@ def expense_category_keyboard(user_id):
     keyboard.add(types.KeyboardButton("Отмена"))
     return keyboard
 
+
 def process_expense_category(message, amount):
     if message.text == 'Отмена':
         bot.send_message(message.chat.id, "Операция отменена.", reply_markup=main_keyboard())
@@ -275,7 +313,8 @@ def process_expense_category(message, amount):
 
     user_id = message.from_user.id
     if message.text == "Удалить категорию":
-        bot.send_message(message.chat.id, "Выберите категорию для удаления:", reply_markup=delete_category_keyboard(user_id, "expense"))
+        bot.send_message(message.chat.id, "Выберите категорию для удаления:",
+                         reply_markup=delete_category_keyboard(user_id, "expense"))
         bot.register_next_step_handler(message, process_delete_category, "expense")
         return
 
@@ -287,6 +326,7 @@ def process_expense_category(message, amount):
         transaction = {"Дата": formatted_date, "Тип": "Расход", "Сумма": -amount, "Категория": category}
         save_transaction(user_id, transaction)
         bot.send_message(message.chat.id, "Расход добавлен!", reply_markup=main_keyboard())
+
 
 def process_new_expense_category(message, amount):
     if message.text == 'Отмена':
@@ -305,6 +345,7 @@ def process_new_expense_category(message, amount):
     save_transaction(user_id, transaction)
     bot.send_message(message.chat.id, "Расход добавлен!", reply_markup=main_keyboard())
 
+
 def delete_category_keyboard(user_id, category_type):
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     categories = income_category.get(user_id, []) if category_type == "income" else expense_category.get(user_id, [])
@@ -312,6 +353,7 @@ def delete_category_keyboard(user_id, category_type):
         keyboard.add(types.KeyboardButton(category))
     keyboard.add(types.KeyboardButton("Отмена"))
     return keyboard
+
 
 def process_delete_category(message, category_type):
     if message.text == 'Отмена':
@@ -336,12 +378,14 @@ def process_delete_category(message, category_type):
         else:
             bot.send_message(message.chat.id, "Категория не найдена.", reply_markup=main_keyboard())
 
+
 def save_transaction(user_id, transaction):
     if user_id in data:
         data[user_id].append(transaction)
     else:
         data[user_id] = [transaction]
     save_transaction_to_file(user_id, transaction)
+
 
 @bot.message_handler(func=lambda message: message.text == 'Экспорт данных')
 def export_data(message):
@@ -389,11 +433,13 @@ def delete_data(message):
             confirm_keyboard = types.InlineKeyboardMarkup()
             confirm_keyboard.add(types.InlineKeyboardButton("Да", callback_data="confirm_delete"))
             confirm_keyboard.add(types.InlineKeyboardButton("Нет", callback_data="cancel_delete"))
-            bot.send_message(message.chat.id, "Вы уверены, что хотите удалить все данные?", reply_markup=confirm_keyboard)
+            bot.send_message(message.chat.id, "Вы уверены, что хотите удалить все данные?",
+                             reply_markup=confirm_keyboard)
         else:
             bot.send_message(message.chat.id, "Нет данных для удаления.", reply_markup=main_keyboard())
     else:
         bot.send_message(message.chat.id, "Для получения доступа оплатите подписку.", reply_markup=check_keyboard())
+
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
@@ -410,5 +456,15 @@ def callback_query(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
         bot.send_message(call.message.chat.id, "Удаление отменено.", reply_markup=main_keyboard())
 
+
 if __name__ == '__main__':
-    bot.polling(none_stop=True)
+
+    while True:
+        try:
+            bot.polling(none_stop=True, timeout=60, long_polling_timeout=60)
+        except requests.exceptions.ReadTimeout:
+            print("ReadTimeout occurred. Retrying in 5 seconds...")
+            time.sleep(5)
+        except Exception as e:
+            print(f"Unexpected error occurred: {e}")
+            time.sleep(5)
